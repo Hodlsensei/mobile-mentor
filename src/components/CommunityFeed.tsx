@@ -28,8 +28,8 @@ export const CommunityFeed = () => {
     const stMap = new Map((stations ?? []).map((s) => [s.id, s]));
 
     const merged: Item[] = [
-      ...(pwr ?? []).map((r) => ({
-        type: "power" as const,
+      ...(pwr ?? []).map((r): Item => ({
+        type: "power",
         id: r.id,
         created_at: r.created_at,
         upvotes: r.upvotes,
