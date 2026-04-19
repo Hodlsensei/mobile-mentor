@@ -301,15 +301,15 @@ export const FuelReports = () => {
 
       {loading ? (
         <div className="flex h-40 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-      ) : reports.length === 0 ? (
+      ) : filteredReports.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-12 text-center">
           <Fuel className="mx-auto h-10 w-10 text-muted-foreground" />
-          <p className="mt-3 font-medium">No fuel reports yet</p>
-          <p className="text-sm text-muted-foreground">Add a station, then submit the first report.</p>
+          <p className="mt-3 font-medium">{reports.length === 0 ? "No fuel reports yet" : "No reports match your filters"}</p>
+          <p className="text-sm text-muted-foreground">{reports.length === 0 ? "Add a station, then submit the first report." : "Try clearing or relaxing the filters."}</p>
         </div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          {reports.map((r) => {
+          {filteredReports.map((r) => {
             const ft = FUEL_TYPES.find((f) => f.value === r.fuel_type);
             return (
               <div key={r.id} className="rounded-xl border border-border bg-card p-4 shadow-card">
