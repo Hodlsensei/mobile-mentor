@@ -132,12 +132,59 @@ export const FuelReports = () => {
     );
   };
 
+  const handleAlertToggle = async (next: boolean) => {
+    if (next && permission !== "granted") {
+      const res = await request();
+      if (res !== "granted") {
+        toast({ title: "Notifications blocked", description: "Enable notifications in your browser to get alerts.", variant: "destructive" });
+        return;
+      }
+    }
+    setAlertsOn(next);
+    if (next) toast({ title: "Alerts on", description: `You'll get a ping for new fuel reports in ${filters.area || filters.state}.` });
+  };
+
+  const filteredReports = useMemo(() => {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    return reports.filter((r) => {
+      const st = r.station;
+      if (filters.state && st?.state !== filters.state) return false;
+      if (filters.area && !(st?.area ?? "").toLowerCase().includes(filters.area.toLowerCase())) return false;
+      if (filters.fuelType && r.fuel_type !== filters.fuelType) return false;
+      if (filters.last24h && new Date(r.created_at).getTime() < cutoff) return false;
+      return true;
+    });
+  }, [reports, filters]);
+
+  // Alert items need state/area attached for matching.
+  const alertItems = useMemo(
+    () => reports.map((r) => ({ id: r.id, state: r.station?.state ?? null, area: r.station?.area ?? null, created_at: r.created_at, _ref: r })),
+    [reports],
+  );
+  useAreaAlerts(
+    alertItems,
+    { enabled: alertsOn, state: filters.state, area: filters.area, label: "Fuel" },
+    (i) => {
+      const r = i._ref;
+      const ft = FUEL_TYPES.find((f) => f.value === r.fuel_type)?.label ?? r.fuel_type;
+      return `${r.station?.name ?? "Station"}: ${ft} ${r.available ? "available" : "out"}${r.price_naira ? ` • ${formatNaira(r.price_naira)}/L` : ""}`;
+    },
+  );
+
   return (
     <div className="space-y-4">
+      <ReportFilters
+        filters={filters}
+        onChange={setFilters}
+        showFuelType
+        alertEnabled={alertsOn}
+        onAlertToggle={handleAlertToggle}
+        alertCapable={supported}
+      />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="font-display text-lg font-semibold">Fuel stations near you</h3>
-          <p className="text-sm text-muted-foreground">{stations.length} stations • {reports.length} recent reports</p>
+          <p className="text-sm text-muted-foreground">{stations.length} stations • {filteredReports.length} of {reports.length} reports</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={stationOpen} onOpenChange={setStationOpen}>
