@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { NIGERIAN_STATES, FUEL_TYPES, formatNaira, timeAgo } from "@/lib/nigeria";
 import { Plus, Fuel, Loader2, ThumbsUp, MapPin } from "lucide-react";
 import { z } from "zod";
+import { ReportFilters, FilterState } from "@/components/ReportFilters";
+import { useAreaAlerts, useNotificationPermission } from "@/hooks/useAreaAlerts";
 
 interface Station { id: string; name: string; brand: string | null; area: string; state: string; }
 interface FuelReport {
