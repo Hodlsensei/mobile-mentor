@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Zap, Fuel, MapPin, Users, Calculator, ArrowRight, Activity } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { Leaderboard } from "@/components/Leaderboard";
 
 const Index = () => {
   const { user } = useAuth();
@@ -174,6 +175,9 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      {/* Leaderboard */}
+      <Leaderboard />
 
       {/* CTA */}
       <section id="community" className="py-20">
