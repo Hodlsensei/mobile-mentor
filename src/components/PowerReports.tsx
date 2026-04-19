@@ -168,7 +168,15 @@ export const PowerReports = () => {
   );
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_400px]">
+    <div className="space-y-4">
+      <ReportFilters
+        filters={filters}
+        onChange={setFilters}
+        alertEnabled={alertsOn}
+        onAlertToggle={handleAlertToggle}
+        alertCapable={supported}
+      />
+      <div className="grid gap-4 lg:grid-cols-[1fr_400px]">
       {/* Map */}
       <div className="relative h-[400px] overflow-hidden rounded-xl border border-border shadow-card lg:h-[600px]">
         <MapContainer center={center} zoom={mapped.length ? 11 : 6} className="h-full w-full">
@@ -263,17 +271,17 @@ export const PowerReports = () => {
       <div className="rounded-xl border border-border bg-card shadow-card">
         <div className="border-b border-border p-4">
           <h3 className="font-display text-lg font-semibold">Live reports</h3>
-          <p className="text-xs text-muted-foreground">{reports.length} reports • updates in real-time</p>
+          <p className="text-xs text-muted-foreground">{filtered.length} of {reports.length} reports • real-time</p>
         </div>
         <div className="max-h-[540px] overflow-y-auto">
           {loading ? (
             <div className="flex h-32 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : reports.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
-              No reports yet. Be the first! Tap <strong>Report</strong>.
+              {reports.length === 0 ? <>No reports yet. Be the first! Tap <strong>Report</strong>.</> : "No reports match your filters."}
             </div>
           ) : (
-            reports.map((r) => {
+            filtered.map((r) => {
               const cfg = statusConfig[r.status];
               const Icon = r.status === "light" ? Zap : ZapOff;
               return (
@@ -300,6 +308,7 @@ export const PowerReports = () => {
             })
           )}
         </div>
+      </div>
       </div>
     </div>
   );
