@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,9 @@ const reportSchema = z.object({
 export const FuelReports = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [filters, setFilters] = useState<FilterState>({ state: "", area: "", fuelType: "", last24h: false });
+  const [alertsOn, setAlertsOn] = useState(false);
+  const { permission, request, supported } = useNotificationPermission();
   const [stations, setStations] = useState<Station[]>([]);
   const [reports, setReports] = useState<(FuelReport & { station: Station | null })[]>([]);
   const [loading, setLoading] = useState(true);
