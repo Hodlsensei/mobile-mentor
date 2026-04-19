@@ -146,10 +146,26 @@ export const PowerReports = () => {
     if (error) toast({ title: "Couldn't vote", description: error.message, variant: "destructive" });
   };
 
-  const mapped = useMemo(() => reports.filter((r) => r.latitude && r.longitude), [reports]);
+  const filtered = useMemo(() => {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    return reports.filter((r) => {
+      if (filters.state && r.state !== filters.state) return false;
+      if (filters.area && !r.area.toLowerCase().includes(filters.area.toLowerCase())) return false;
+      if (filters.last24h && new Date(r.created_at).getTime() < cutoff) return false;
+      return true;
+    });
+  }, [reports, filters]);
+
+  const mapped = useMemo(() => filtered.filter((r) => r.latitude && r.longitude), [filtered]);
   const center: [number, number] = mapped.length
     ? [mapped[0].latitude!, mapped[0].longitude!]
     : [9.082, 8.6753]; // Nigeria center
+
+  useAreaAlerts(
+    reports,
+    { enabled: alertsOn, state: filters.state, area: filters.area, label: "Power" },
+    (r) => `${r.area}, ${r.state}: ${statusConfig[r.status].label}`,
+  );
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_400px]">
