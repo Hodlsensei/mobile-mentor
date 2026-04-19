@@ -176,6 +176,9 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Leaderboard */}
+      <Leaderboard />
+
       {/* CTA */}
       <section id="community" className="py-20">
         <div className="container">
