@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { NIGERIAN_STATES, DISCOS, timeAgo } from "@/lib/nigeria";
 import { Plus, Zap, ZapOff, Loader2, ThumbsUp } from "lucide-react";
 import { z } from "zod";
+import { ReportFilters, FilterState } from "@/components/ReportFilters";
+import { useAreaAlerts, useNotificationPermission } from "@/hooks/useAreaAlerts";
 
 // Default Leaflet icon fix
 delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
@@ -60,6 +62,21 @@ export const PowerReports = () => {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [form, setForm] = useState({ area: "", state: "", disco: "", status: "light" as const, notes: "" });
+  const [filters, setFilters] = useState<FilterState>({ state: "", area: "", last24h: false });
+  const [alertsOn, setAlertsOn] = useState(false);
+  const { permission, request, supported } = useNotificationPermission();
+
+  const handleAlertToggle = async (next: boolean) => {
+    if (next && permission !== "granted") {
+      const res = await request();
+      if (res !== "granted") {
+        toast({ title: "Notifications blocked", description: "Enable notifications in your browser to get alerts.", variant: "destructive" });
+        return;
+      }
+    }
+    setAlertsOn(next);
+    if (next) toast({ title: "Alerts on", description: `You'll get a ping for new power reports in ${filters.area || filters.state}.` });
+  };
 
   const loadReports = async () => {
     const { data, error } = await supabase
