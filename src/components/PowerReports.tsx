@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { NIGERIAN_STATES, DISCOS, timeAgo } from "@/lib/nigeria";
 import { Plus, Zap, ZapOff, Loader2, ThumbsUp } from "lucide-react";
 import { z } from "zod";
+import { ReportFilters, FilterState } from "@/components/ReportFilters";
+import { useAreaAlerts, useNotificationPermission } from "@/hooks/useAreaAlerts";
 
 // Default Leaflet icon fix
 delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
@@ -60,6 +62,21 @@ export const PowerReports = () => {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [form, setForm] = useState({ area: "", state: "", disco: "", status: "light" as const, notes: "" });
+  const [filters, setFilters] = useState<FilterState>({ state: "", area: "", last24h: false });
+  const [alertsOn, setAlertsOn] = useState(false);
+  const { permission, request, supported } = useNotificationPermission();
+
+  const handleAlertToggle = async (next: boolean) => {
+    if (next && permission !== "granted") {
+      const res = await request();
+      if (res !== "granted") {
+        toast({ title: "Notifications blocked", description: "Enable notifications in your browser to get alerts.", variant: "destructive" });
+        return;
+      }
+    }
+    setAlertsOn(next);
+    if (next) toast({ title: "Alerts on", description: `You'll get a ping for new power reports in ${filters.area || filters.state}.` });
+  };
 
   const loadReports = async () => {
     const { data, error } = await supabase
@@ -129,13 +146,37 @@ export const PowerReports = () => {
     if (error) toast({ title: "Couldn't vote", description: error.message, variant: "destructive" });
   };
 
-  const mapped = useMemo(() => reports.filter((r) => r.latitude && r.longitude), [reports]);
+  const filtered = useMemo(() => {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    return reports.filter((r) => {
+      if (filters.state && r.state !== filters.state) return false;
+      if (filters.area && !r.area.toLowerCase().includes(filters.area.toLowerCase())) return false;
+      if (filters.last24h && new Date(r.created_at).getTime() < cutoff) return false;
+      return true;
+    });
+  }, [reports, filters]);
+
+  const mapped = useMemo(() => filtered.filter((r) => r.latitude && r.longitude), [filtered]);
   const center: [number, number] = mapped.length
     ? [mapped[0].latitude!, mapped[0].longitude!]
     : [9.082, 8.6753]; // Nigeria center
 
+  useAreaAlerts(
+    reports,
+    { enabled: alertsOn, state: filters.state, area: filters.area, label: "Power" },
+    (r) => `${r.area}, ${r.state}: ${statusConfig[r.status].label}`,
+  );
+
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_400px]">
+    <div className="space-y-4">
+      <ReportFilters
+        filters={filters}
+        onChange={setFilters}
+        alertEnabled={alertsOn}
+        onAlertToggle={handleAlertToggle}
+        alertCapable={supported}
+      />
+      <div className="grid gap-4 lg:grid-cols-[1fr_400px]">
       {/* Map */}
       <div className="relative h-[400px] overflow-hidden rounded-xl border border-border shadow-card lg:h-[600px]">
         <MapContainer center={center} zoom={mapped.length ? 11 : 6} className="h-full w-full">
@@ -230,17 +271,17 @@ export const PowerReports = () => {
       <div className="rounded-xl border border-border bg-card shadow-card">
         <div className="border-b border-border p-4">
           <h3 className="font-display text-lg font-semibold">Live reports</h3>
-          <p className="text-xs text-muted-foreground">{reports.length} reports • updates in real-time</p>
+          <p className="text-xs text-muted-foreground">{filtered.length} of {reports.length} reports • real-time</p>
         </div>
         <div className="max-h-[540px] overflow-y-auto">
           {loading ? (
             <div className="flex h-32 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : reports.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
-              No reports yet. Be the first! Tap <strong>Report</strong>.
+              {reports.length === 0 ? <>No reports yet. Be the first! Tap <strong>Report</strong>.</> : "No reports match your filters."}
             </div>
           ) : (
-            reports.map((r) => {
+            filtered.map((r) => {
               const cfg = statusConfig[r.status];
               const Icon = r.status === "light" ? Zap : ZapOff;
               return (
@@ -267,6 +308,7 @@ export const PowerReports = () => {
             })
           )}
         </div>
+      </div>
       </div>
     </div>
   );

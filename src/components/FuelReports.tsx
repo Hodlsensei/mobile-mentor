@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { NIGERIAN_STATES, FUEL_TYPES, formatNaira, timeAgo } from "@/lib/nigeria";
 import { Plus, Fuel, Loader2, ThumbsUp, MapPin } from "lucide-react";
 import { z } from "zod";
+import { ReportFilters, FilterState } from "@/components/ReportFilters";
+import { useAreaAlerts, useNotificationPermission } from "@/hooks/useAreaAlerts";
 
 interface Station { id: string; name: string; brand: string | null; area: string; state: string; }
 interface FuelReport {
@@ -39,6 +41,9 @@ const reportSchema = z.object({
 export const FuelReports = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [filters, setFilters] = useState<FilterState>({ state: "", area: "", fuelType: "", last24h: false });
+  const [alertsOn, setAlertsOn] = useState(false);
+  const { permission, request, supported } = useNotificationPermission();
   const [stations, setStations] = useState<Station[]>([]);
   const [reports, setReports] = useState<(FuelReport & { station: Station | null })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,12 +132,59 @@ export const FuelReports = () => {
     );
   };
 
+  const handleAlertToggle = async (next: boolean) => {
+    if (next && permission !== "granted") {
+      const res = await request();
+      if (res !== "granted") {
+        toast({ title: "Notifications blocked", description: "Enable notifications in your browser to get alerts.", variant: "destructive" });
+        return;
+      }
+    }
+    setAlertsOn(next);
+    if (next) toast({ title: "Alerts on", description: `You'll get a ping for new fuel reports in ${filters.area || filters.state}.` });
+  };
+
+  const filteredReports = useMemo(() => {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    return reports.filter((r) => {
+      const st = r.station;
+      if (filters.state && st?.state !== filters.state) return false;
+      if (filters.area && !(st?.area ?? "").toLowerCase().includes(filters.area.toLowerCase())) return false;
+      if (filters.fuelType && r.fuel_type !== filters.fuelType) return false;
+      if (filters.last24h && new Date(r.created_at).getTime() < cutoff) return false;
+      return true;
+    });
+  }, [reports, filters]);
+
+  // Alert items need state/area attached for matching.
+  const alertItems = useMemo(
+    () => reports.map((r) => ({ id: r.id, state: r.station?.state ?? null, area: r.station?.area ?? null, created_at: r.created_at, _ref: r })),
+    [reports],
+  );
+  useAreaAlerts(
+    alertItems,
+    { enabled: alertsOn, state: filters.state, area: filters.area, label: "Fuel" },
+    (i) => {
+      const r = i._ref;
+      const ft = FUEL_TYPES.find((f) => f.value === r.fuel_type)?.label ?? r.fuel_type;
+      return `${r.station?.name ?? "Station"}: ${ft} ${r.available ? "available" : "out"}${r.price_naira ? ` • ${formatNaira(r.price_naira)}/L` : ""}`;
+    },
+  );
+
   return (
     <div className="space-y-4">
+      <ReportFilters
+        filters={filters}
+        onChange={setFilters}
+        showFuelType
+        alertEnabled={alertsOn}
+        onAlertToggle={handleAlertToggle}
+        alertCapable={supported}
+      />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="font-display text-lg font-semibold">Fuel stations near you</h3>
-          <p className="text-sm text-muted-foreground">{stations.length} stations • {reports.length} recent reports</p>
+          <p className="text-sm text-muted-foreground">{stations.length} stations • {filteredReports.length} of {reports.length} reports</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={stationOpen} onOpenChange={setStationOpen}>
@@ -249,15 +301,15 @@ export const FuelReports = () => {
 
       {loading ? (
         <div className="flex h-40 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-      ) : reports.length === 0 ? (
+      ) : filteredReports.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-12 text-center">
           <Fuel className="mx-auto h-10 w-10 text-muted-foreground" />
-          <p className="mt-3 font-medium">No fuel reports yet</p>
-          <p className="text-sm text-muted-foreground">Add a station, then submit the first report.</p>
+          <p className="mt-3 font-medium">{reports.length === 0 ? "No fuel reports yet" : "No reports match your filters"}</p>
+          <p className="text-sm text-muted-foreground">{reports.length === 0 ? "Add a station, then submit the first report." : "Try clearing or relaxing the filters."}</p>
         </div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          {reports.map((r) => {
+          {filteredReports.map((r) => {
             const ft = FUEL_TYPES.find((f) => f.value === r.fuel_type);
             return (
               <div key={r.id} className="rounded-xl border border-border bg-card p-4 shadow-card">
